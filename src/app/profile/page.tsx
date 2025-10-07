@@ -23,13 +23,13 @@ export default function ProfilePage() {
   const router = useRouter();
 
   useEffect(() => {
-    const email = localStorage.getItem('userEmail');
-    if (!email) {
-      setError('ایمیل کاربر یافت نشد. لطفاً ابتدا ثبت‌نام کنید.');
+    const phone = localStorage.getItem('userPhone');
+    if (!phone) {
+      setError('شماره همراه کاربر یافت نشد. لطفاً ابتدا وارد شوید.');
       return;
     }
 
-    const filePath = `/users/${email}.json`;
+    const filePath = `/users/${phone}/profile.json`;
 
     fetch(filePath)
       .then((res) => {
@@ -59,6 +59,8 @@ export default function ProfilePage() {
     );
   }
 
+  const documentPath = `/users/${user.phone}/documents/${user.documentFileName}`;
+
   return (
     <main dir="rtl" className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white p-6 flex flex-col items-center justify-center">
       <div className="bg-white/10 backdrop-blur-md rounded-xl shadow-xl p-8 w-full max-w-2xl mb-6">
@@ -82,13 +84,13 @@ export default function ProfilePage() {
           <div className="mt-10 text-center">
             <h3 className="text-lg font-bold text-yellow-400 mb-4">مدرک شناسایی</h3>
             <img
-              src={`/uploads/${user.documentFileName}`}
+              src={documentPath}
               alt="مدرک شناسایی"
               className="mx-auto rounded-lg border border-gray-700 shadow-md max-w-xs mb-4"
             />
             <div className="flex justify-center gap-4">
               <a
-                href={`/uploads/${user.documentFileName}`}
+                href={documentPath}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
@@ -96,7 +98,7 @@ export default function ProfilePage() {
                 مشاهده در اندازه کامل
               </a>
               <a
-                href={`/uploads/${user.documentFileName}`}
+                href={documentPath}
                 download={user.documentFileName}
                 className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
               >

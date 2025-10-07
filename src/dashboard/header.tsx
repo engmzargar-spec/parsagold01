@@ -12,11 +12,14 @@ export default function Header({ user }: { user: any }) {
   const [selectedMessage, setSelectedMessage] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
+  const [userId, setUserId] = useState('');
+  const [profile, setProfile] = useState<any>({});
 
   const unreadCount = messages.filter((msg) => !msg.read).length;
 
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');
+    localStorage.removeItem('userId');
     router.push('/');
   };
 
@@ -33,7 +36,7 @@ export default function Header({ user }: { user: any }) {
   const formatJalaliDate = (iso: string) => {
     const date = new Date(iso);
     const j = toJalaali(date);
-    return `${j.jy}/${j.jm}/${j.jd}`;
+    return `${j.jy}/${String(j.jm).padStart(2, '0')}/${String(j.jd).padStart(2, '0')}`;
   };
 
   const formatGregorianDate = (date: Date) => {
@@ -50,17 +53,12 @@ export default function Header({ user }: { user: any }) {
       timeZone: tz,
     });
 
-  const maskPhone = (phone: string) => {
-    if (!phone || phone.length < 10) return phone;
-    return `${phone.slice(0, 4)} *** ${phone.slice(-4)}`;
-  };
-
   const filteredMessages = messages.filter((msg) => {
     const term = searchTerm.toLowerCase();
     return (
-      msg.title.toLowerCase().includes(term) ||
-      msg.content.toLowerCase().includes(term) ||
-      msg.id.toString().includes(term) ||
+      msg.title?.toLowerCase().includes(term) ||
+      msg.content?.toLowerCase().includes(term) ||
+      msg.id?.toString().includes(term) ||
       formatJalaliDate(msg.timestamp).includes(term)
     );
   });
@@ -70,39 +68,57 @@ export default function Header({ user }: { user: any }) {
     if (!email) return;
 
     const safeEmail = email.replace(/[@.]/g, '_');
-    const messagesPath = `/messages/${safeEmail}`;
 
-    fetch(messagesPath)
-      .then((res) => res.text())
-      .then((html) => {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const links = Array.from(doc.querySelectorAll('a'))
-          .map((a) => a.getAttribute('href'))
-          .filter((href) => href && href.endsWith('.json'));
+    // مرحله 1: گرفتن userId از identifiers.json
+    fetch('/users/identifiers.json')
+      .then((res) => res.json())
+      .then((data) => {
+        const id = data[safeEmail]?.userId;
+        if (id) {
+          setUserId(id);
 
-        return Promise.all(
-          links.map((file) =>
-            fetch(`${messagesPath}/${file}`)
-              .then((res) => res.json())
-              .catch(() => null)
-          )
-        );
-      })
-      .then((msgs) => {
-        const validMessages = msgs.filter((m) => m && m.title && m.content);
-        const sorted = validMessages.sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        setMessages(sorted);
+          // مرحله 2: گرفتن پروفایل از پوشه کاربر
+          fetch(`/users/${id}/profile.json`)
+            .then((res) => res.json())
+            .then((profileData) => {
+              setProfile(profileData);
+            });
+
+          // مرحله 3: گرفتن پیام‌ها از پوشه کاربر
+          const messagesPath = `/users/${id}/messages`;
+          fetch(messagesPath)
+            .then((res) => res.text())
+            .then((html) => {
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(html, 'text/html');
+              const links = Array.from(doc.querySelectorAll('a'))
+                .map((a) => a.getAttribute('href'))
+                .filter((href) => href && href.endsWith('.json'));
+
+              return Promise.all(
+                links.map((file) =>
+                  fetch(`${messagesPath}/${file}`)
+                    .then((res) => res.json())
+                    .catch(() => null)
+                )
+              );
+            })
+            .then((msgs) => {
+              const validMessages = msgs.filter((m) => m && m.title && m.content);
+              const sorted = validMessages.sort(
+                (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+              );
+              setMessages(sorted);
+            });
+        }
       })
       .catch((err) => {
-        console.error('خطا در بارگذاری پیام‌ها:', err);
+        console.error('❌ خطا در دریافت اطلاعات کاربر:', err);
       });
   }, [user?.email]);
   return (
     <header className="bg-gray-900 text-white px-6 py-4 shadow-md flex relative">
-      {/* 📱 دکمه خروج موبایل در گوشه بالا سمت چپ */}
+      {/* 📱 دکمه خروج موبایل */}
       <button
         onClick={handleLogout}
         className="absolute top-4 left-4 md:hidden text-yellow-400 hover:text-yellow-300 transition"
@@ -111,7 +127,7 @@ export default function Header({ user }: { user: any }) {
         <ArrowRightOnRectangleIcon className="w-6 h-6" />
       </button>
 
-      {/* 🕒 سمت راست: تاریخ و ساعت جهانی */}
+      {/* 🕒 تاریخ و ساعت جهانی */}
       <div className="w-1/3 flex justify-start items-center text-sm text-gray-200 font-medium gap-x-3 flex-wrap">
         <div>{formatJalaliDate(new Date().toISOString())}</div>
         <span className="text-gray-500">|</span>
@@ -128,18 +144,13 @@ export default function Header({ user }: { user: any }) {
         </div>
       </div>
 
-      {/* 🖼 وسط: لوگو */}
+      {/* 🖼 لوگو */}
       <div className="w-1/3 flex justify-center">
-        <img
-          src="/parsagold-logo-03.png"
-          alt="Parsagold Logo"
-          className="h-20 w-auto"
-        />
+        <img src="/parsagold-logo-03.png" alt="Parsagold Logo" className="h-20 w-auto" />
       </div>
 
-      {/* 👤 سمت چپ: خروج ← زنگوله ← شماره ← نام */}
+      {/* 👤 نام، شناسه، زنگوله، خروج دسکتاپ */}
       <div className="w-1/3 hidden md:flex justify-between items-center flex-row-reverse pr-2 space-x-2">
-        {/* 🔓 دکمه خروج دسکتاپ */}
         <button
           onClick={handleLogout}
           className="px-3 py-1 bg-yellow-500 text-black rounded-md hover:bg-yellow-400 transition"
@@ -172,9 +183,7 @@ export default function Header({ user }: { user: any }) {
                     onClick={() => handleMessageClick(msg.id)}
                     className="border-b border-gray-200 pb-2 flex items-center space-x-2 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
                   >
-                    {!msg.read && (
-                      <span className="w-2 h-2 bg-red-500 rounded-full" />
-                    )}
+                    {!msg.read && <span className="w-2 h-2 bg-red-500 rounded-full" />}
                     <span className="text-gray-800 font-medium">
                       {index + 1}. {msg.title}
                     </span>
@@ -196,11 +205,19 @@ export default function Header({ user }: { user: any }) {
           )}
         </div>
 
-        {/* 📱 شماره کاربری (ماسک‌شده) */}
-        <span className="text-sm text-gray-400 ml-2">{maskPhone(user.phone)}</span>
-
-        {/* 👤 نام کاربری */}
-        <span className="text-sm text-gray-300">{user.firstName}</span>
+        {/* 👤 شناسه و نام کاربر */}
+        <div className="flex flex-col items-end text-sm">
+          {userId ? (
+            <span className="text-yellow-400">{userId}</span>
+          ) : (
+            <span className="text-gray-500">در حال بارگذاری شناسه...</span>
+          )}
+          {profile.firstName ? (
+            <span className="text-gray-300">{profile.firstName}</span>
+          ) : (
+            <span className="text-gray-500">در حال بارگذاری نام...</span>
+          )}
+        </div>
       </div>
 
       {/* 📩 مودال پیام انتخاب‌شده */}
@@ -228,7 +245,6 @@ export default function Header({ user }: { user: any }) {
           <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-lg p-6 text-right max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4 text-gray-800">تمام پیام‌ها</h3>
 
-            {/* 🔍 فیلد جستجو */}
             <input
               type="text"
               placeholder="جستجو بر اساس عنوان، متن، شماره یا تاریخ..."
@@ -254,9 +270,7 @@ export default function Header({ user }: { user: any }) {
                       {!msg.read && <span className="w-2 h-2 bg-red-500 rounded-full" />}
                     </div>
                     <div className="text-sm text-gray-700 mt-1">
-                      {msg.content.length > 80
-                        ? msg.content.slice(0, 80) + '...'
-                        : msg.content}
+                      {msg.content.length > 80 ? msg.content.slice(0, 80) + '...' : msg.content}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
                       {formatJalaliDate(msg.timestamp)}

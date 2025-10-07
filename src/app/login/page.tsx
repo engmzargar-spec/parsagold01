@@ -19,7 +19,7 @@ function generateCaptcha() {
 export default function LoginPage() {
   const router = useRouter();
 
-  const [phone, setPhone] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [captchaInput, setCaptchaInput] = useState('');
   const [captchaCode, setCaptchaCode] = useState('');
@@ -42,7 +42,7 @@ export default function LoginPage() {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, password }),
+        body: JSON.stringify({ identifier, password }),
       });
 
       const result = await res.json();
@@ -52,12 +52,13 @@ export default function LoginPage() {
         return;
       }
 
-      // ذخیره پیام ورود موفق در پوشه پیام‌ها
+      localStorage.setItem('userPhone', result.phone);
+
       await fetch('/api/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: result.email,
+          phone: result.phone,
           type: 'login',
           title: 'ورود موفق',
           content: `خوش آمدید ${result.firstName} عزیز! ورود شما با موفقیت انجام شد.`,
@@ -83,10 +84,10 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <input
-              type="tel"
-              placeholder="شماره همراه"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              type="text"
+              placeholder="ایمیل یا شماره همراه"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               required
               className="w-full px-4 py-3 rounded-md bg-gray-800 text-white placeholder-gray-400 text-right focus:outline-none focus:ring-2 focus:ring-yellow-500"
             />

@@ -24,13 +24,13 @@ export default function VerifyPage() {
   });
 
   useEffect(() => {
-    const email = localStorage.getItem('userEmail');
-    if (!email) {
-      setError('ایمیل کاربر یافت نشد.');
+    const phone = localStorage.getItem('userPhone');
+    if (!phone) {
+      setError('شماره همراه کاربر یافت نشد.');
       return;
     }
 
-    fetch(`/users/${email}.json`)
+    fetch(`/users/${phone}/profile.json`)
       .then((res) => {
         if (!res.ok) throw new Error('فایل کاربر یافت نشد.');
         return res.json();
@@ -80,7 +80,7 @@ export default function VerifyPage() {
     }
 
     const formData = new FormData();
-    formData.append('email', user.email);
+    formData.append('phone', user.phone);
     formData.append('verifiedEmail', form.emailCode === '123456' ? 'true' : 'false');
     formData.append('verifiedPhone', form.phoneCode === '123456' ? 'true' : 'false');
     formData.append('gender', form.gender);
@@ -97,12 +97,11 @@ export default function VerifyPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.message);
 
-      // ذخیره پیام احراز هویت موفق در پوشه پیام‌ها
       await fetch('/api/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: user.email,
+          phone: user.phone,
           type: 'verify',
           title: 'ثبت احراز هویت',
           content: 'احراز هویت شما با موفقیت ثبت شد. منتظر بررسی کارشناس باشید.',
