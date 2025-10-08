@@ -13,32 +13,33 @@ export async function POST(request: Request) {
   try {
     const { firstName, lastName, email, phone, password } = await request.json();
 
-    if (!firstName || !lastName || !email || !phone || !password) {
-      return NextResponse.json({ message: 'همه فیلدها الزامی هستند.' }, { status: 400 });
+    if (!firstName || !lastName || !phone || !password) {
+      return NextResponse.json({ message: 'همه فیلدهای ضروری باید پر شوند.' }, { status: 400 });
     }
 
     const usersRoot = path.join(process.cwd(), 'public', 'users');
     const identifiersPath = path.join(usersRoot, 'identifiers.json');
 
-    // بررسی وجود پوشه users و فایل identifiers.json
+    // ساخت پوشه users در صورت نیاز
     if (!fs.existsSync(usersRoot)) {
       fs.mkdirSync(usersRoot, { recursive: true });
     }
 
+    // خواندن فایل identifiers.json
     let identifiersData: Record<string, any> = {};
     if (fs.existsSync(identifiersPath)) {
       identifiersData = JSON.parse(fs.readFileSync(identifiersPath, 'utf-8'));
     }
 
-    const safeEmail = email.replace(/[@.]/g, '_');
-    if (identifiersData[safeEmail]) {
-      return NextResponse.json({ message: 'ایمیل یا شماره همراه قبلاً ثبت شده است.' }, { status: 409 });
+    // بررسی تکراری بودن شماره موبایل
+    if (identifiersData[phone]) {
+      return NextResponse.json({ message: 'شماره همراه قبلاً ثبت شده است.' }, { status: 409 });
     }
 
     // تولید شناسه یکتا
     let userId = generateUserId();
     while (fs.existsSync(path.join(usersRoot, userId))) {
-      userId = generateUserId(); // جلوگیری از تکرار
+      userId = generateUserId();
     }
 
     // هش رمز عبور
@@ -50,11 +51,11 @@ export async function POST(request: Request) {
     const { jy, jm, jd } = toJalaali(now);
     const joinedAtJalali = `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`;
 
-    // ساخت پوشه اختصاصی کاربر
-    const userDir = path.join(usersRoot, userId);
+    // ساخت پوشه اختصاصی کاربر با شماره موبایل
+    const userDir = path.join(usersRoot, phone);
     fs.mkdirSync(userDir, { recursive: true });
 
-    // ذخیره اطلاعات کاربر در profile.json
+    // ذخیره اطلاعات در profile.json
     const profileData = {
       userId,
       firstName,
@@ -67,8 +68,16 @@ export async function POST(request: Request) {
     };
     fs.writeFileSync(path.join(userDir, 'profile.json'), JSON.stringify(profileData, null, 2), 'utf-8');
 
-    // به‌روزرسانی فایل مرکزی identifiers.json
-    identifiersData[safeEmail] = {
+    // ذخیره تنظیمات اولیه در settings.json
+    const settings = {
+      language: 'fa',
+      theme: 'dark',
+      notifications: true,
+    };
+    fs.writeFileSync(path.join(userDir, 'settings.json'), JSON.stringify(settings, null, 2), 'utf-8');
+
+    // ذخیره شناسه‌ها در identifiers.json
+    identifiersData[phone] = {
       userId,
       email,
       phone,
@@ -81,15 +90,7 @@ export async function POST(request: Request) {
       fs.mkdirSync(path.join(userDir, folder), { recursive: true });
     }
 
-    // تنظیمات اولیه
-    const settings = {
-      language: 'fa',
-      theme: 'dark',
-      notifications: true,
-    };
-    fs.writeFileSync(path.join(userDir, 'settings.json'), JSON.stringify(settings, null, 2), 'utf-8');
-
-    return NextResponse.json({ message: 'ثبت‌نام با موفقیت انجام شد.', userId });
+    return NextResponse.json({ message: 'ثبت‌نام با موفقیت انجام شد.', phone });
   } catch (error) {
     console.error('Signup error:', error);
     return NextResponse.json({ message: 'خطا در پردازش ثبت‌نام.' }, { status: 500 });

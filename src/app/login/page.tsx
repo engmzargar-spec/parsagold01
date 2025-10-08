@@ -19,7 +19,7 @@ function generateCaptcha() {
 export default function LoginPage() {
   const router = useRouter();
 
-  const [identifier, setIdentifier] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [captchaInput, setCaptchaInput] = useState('');
   const [captchaCode, setCaptchaCode] = useState('');
@@ -35,6 +35,7 @@ export default function LoginPage() {
 
     if (captchaInput.toLowerCase() !== captchaCode.toLowerCase()) {
       setError('کد کپچا اشتباه است.');
+      setCaptchaCode(generateCaptcha()); // 🔄 رفرش کپچا
       return;
     }
 
@@ -42,13 +43,14 @@ export default function LoginPage() {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier, password }),
+        body: JSON.stringify({ phone, password }),
       });
 
       const result = await res.json();
 
       if (!res.ok) {
         setError(result.message || 'ورود ناموفق بود.');
+        setCaptchaCode(generateCaptcha()); // 🔄 رفرش کپچا
         return;
       }
 
@@ -68,6 +70,7 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err) {
       setError('ارتباط با سرور برقرار نشد.');
+      setCaptchaCode(generateCaptcha()); // 🔄 رفرش کپچا
     }
   };
 
@@ -80,14 +83,14 @@ export default function LoginPage() {
 
       <div className="w-full max-w-5xl bg-gray-900 bg-opacity-70 backdrop-blur-md rounded-xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         <div className="md:w-1/2 w-full p-8 flex flex-col justify-center">
-          <h2 className="text-2xl font-bold text-yellow-400 mb-6 text-center">ورود</h2>
+          <h2 className="text-2xl font-bold text-yellow-400 mb-6 text-center">ورود با شماره همراه</h2>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <input
               type="text"
-              placeholder="ایمیل یا شماره همراه"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="شماره همراه"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               required
               className="w-full px-4 py-3 rounded-md bg-gray-800 text-white placeholder-gray-400 text-right focus:outline-none focus:ring-2 focus:ring-yellow-500"
             />

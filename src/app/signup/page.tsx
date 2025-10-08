@@ -67,11 +67,13 @@ export default function SignupPage() {
     const { jy, jm, jd } = toJalaali(now);
     const joinedAtJalali = `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`;
 
+    const sanitizedPhone = sanitize(form.phone);
+
     const payload = {
       firstName: sanitize(form.firstName),
       lastName: sanitize(form.lastName),
       email: sanitize(form.email),
-      phone: sanitize(form.phone),
+      phone: sanitizedPhone,
       password: form.password,
       joinedAtGregorian,
       joinedAtJalali,
@@ -91,35 +93,27 @@ export default function SignupPage() {
         return;
       }
 
-      localStorage.setItem('userPhone', payload.phone);
+      // پیام خوش‌آمدگویی
+      await fetch('/api/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: payload.phone,
+          type: 'signup',
+          title: `خوش آمدید ${payload.firstName} ${payload.lastName} عزیز`,
+          content: `ثبت‌نام شما با موفقیت انجام شد. لطفاً وارد شوید.`,
+          timestamp: new Date().toISOString(),
+          read: false,
+        }),
+      });
 
-      setTimeout(async () => {
-        try {
-          const messageRes = await fetch('/api/message', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              phone: payload.phone,
-              type: 'signup',
-              title: `خوش آمدید ${payload.firstName} ${payload.lastName} عزیز`,
-              content: `ثبت‌نام شما با موفقیت انجام شد. لطفاً برای تکمیل مراحل احراز هویت اقدام کنید. در صورت نیاز به راهنمایی، از طریق پشتیبانی با ما در تماس باشید.\n\nموفق و پرسود باشید 🌟`,
-              timestamp: new Date().toISOString(),
-              read: false,
-            }),
-          });
-
-          const messageResult = await messageRes.json();
-          console.log('📨 نتیجه ارسال پیام:', messageResult);
-        } catch (err) {
-          console.error('❌ خطا در ارسال پیام خوش‌آمدگویی:', err);
-        } finally {
-          router.push('/dashboard');
-        }
-      }, 3000);
+      // هدایت به صفحه لاگین
+      router.push('/login');
     } catch (err) {
       setError('ارتباط با سرور برقرار نشد.');
     }
   };
+
   return (
     <main dir="rtl" className="relative min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex items-center justify-center px-4 py-10">
       <Link href="/" className="absolute top-6 right-6 text-yellow-400 hover:text-yellow-300 flex items-center gap-2">

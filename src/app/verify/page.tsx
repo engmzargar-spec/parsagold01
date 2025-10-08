@@ -48,8 +48,27 @@ export default function VerifyPage() {
     }
   };
 
-  const handleSendCode = (type: 'email' | 'phone') => {
-    alert(`کد تأیید ${type === 'email' ? 'ایمیل' : 'موبایل'} ارسال شد.`);
+  const handleSendCode = async (type: 'email' | 'phone') => {
+    if (!user) return;
+
+    try {
+      const res = await fetch(`/api/send-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: user.phone,
+          email: user.email,
+          type,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message);
+
+      alert(`کد تأیید ${type === 'email' ? 'ایمیل' : 'موبایل'} ارسال شد.`);
+    } catch (err) {
+      setError(`ارسال کد تأیید ${type} با خطا مواجه شد.`);
+    }
   };
 
   const handleSubmit = async () => {
@@ -124,7 +143,15 @@ export default function VerifyPage() {
 
   return (
     <main dir="rtl" className="min-h-screen bg-black text-white p-6">
-      <h2 className="text-2xl font-bold text-yellow-400 mb-6">احراز هویت</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-yellow-400">احراز هویت</h2>
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm"
+        >
+          بازگشت به داشبورد
+        </button>
+      </div>
 
       <div className="space-y-4 max-w-xl mx-auto">
         <Info label="نام" value={user.firstName} />
