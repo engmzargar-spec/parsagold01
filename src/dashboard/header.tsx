@@ -14,58 +14,126 @@ export default function Header() {
   const [searchTerm, setSearchTerm] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>({});
+  const [times, setTimes] = useState({
+    tehran: '',
+    tokyo: '',
+    london: '',
+    newyork: '',
+  });
 
   const unreadCount = messages.filter((msg) => !msg.read && !msg.archived).length;
 
+  const handleArchive = async (msgId: number) => {
+  const phone = sessionStorage.getItem('loginPhone');
+  if (!phone) return;
+
+  try {
+    await fetch('/api/message/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, id: msgId }),
+    });
+
+    const updated = messages.map((msg) =>
+      msg.id === msgId ? { ...msg, archived: true } : msg
+    );
+    setMessages(updated);
+  } catch (err) {
+    console.error('❌ خطا در آرشیو پیام:', err);
+  }
+};
+ 
+  const handleMessageClick = async (msgId: number) => {
+  const phone = sessionStorage.getItem('loginPhone');
+  if (!phone) return;
+
+  try {
+    await fetch('/api/message', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, id: msgId }),
+    });
+  } catch (err) {
+    console.error('❌ خطا در بروزرسانی پیام:', err);
+  }
+
+  const updated = messages.map((msg) =>
+    msg.id === msgId ? { ...msg, read: true } : msg
+  );
+  setMessages(updated);
+
+  const selected = updated.find((msg) => msg.id === msgId);
+  setSelectedMessage(selected || null);
+  setShowAllMessages(false);
+  setShowArchivedMessages(false);
+};
+
   const handleLogout = () => {
-    localStorage.removeItem('userPhone');
+    sessionStorage.removeItem('loginPhone');
     router.push('/');
   };
 
-  const handleMessageClick = async (msgId: number) => {
-    const phone = localStorage.getItem('userPhone');
-    if (!phone) return;
+  const getTime = (tz: string) =>
+    new Date().toLocaleTimeString('fa-IR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: tz,
+    });
 
-    try {
-      await fetch('/api/message', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, id: msgId }),
-      });
-    } catch (err) {
-      console.error('❌ خطا در بروزرسانی پیام:', err);
-    }
-
-    const updated = messages.map((msg) =>
-      msg.id === msgId ? { ...msg, read: true } : msg
-    );
-    setMessages(updated);
-
-    const selected = updated.find((msg) => msg.id === msgId);
-    setSelectedMessage(selected || null);
-    setShowAllMessages(false);
-    setShowArchivedMessages(false);
+  const updateTimes = () => {
+    setTimes({
+      tehran: getTime('Asia/Tehran'),
+      tokyo: getTime('Asia/Tokyo'),
+      london: getTime('Europe/London'),
+      newyork: getTime('America/New_York'),
+    });
   };
 
-  const handleArchive = async (msgId: number) => {
-    const phone = localStorage.getItem('userPhone');
+  useEffect(() => {
+    updateTimes();
+    const interval = setInterval(updateTimes, 60000);
+    return () => clearInterval(interval);
+  }, []);
+  useEffect(() => {
+    const phone = typeof window !== 'undefined' ? sessionStorage.getItem('loginPhone') : null;
     if (!phone) return;
 
-    try {
-      await fetch('/api/message/archive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, id: msgId }),
-      });
+    const profilePath = `/users/${phone}/profile.json`;
 
-      const updated = messages.map((msg) =>
-        msg.id === msgId ? { ...msg, archived: true } : msg
-      );
-      setMessages(updated);
-    } catch (err) {
-      console.error('❌ خطا در آرشیو پیام:', err);
+    fetch(profilePath)
+      .then((res) => res.json())
+      .then((data) => setProfile(data));
+
+    fetch(`/api/message?phone=${phone}`)
+      .then((res) => res.json())
+      .then((msgs) => {
+        const validMessages = msgs.filter((m) => m && m.title && m.content);
+        const sorted = validMessages.sort(
+          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        setMessages(sorted);
+      })
+      .catch((err) => console.error('❌ خطا در دریافت پیام‌ها:', err));
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const panel = document.getElementById('notification-panel');
+      if (panel && !panel.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
     }
-  };
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
   const formatJalaliDate = (iso: string) => {
     const date = new Date(iso);
     const j = toJalaali(date);
@@ -78,13 +146,6 @@ export default function Header() {
     const dd = String(date.getDate()).padStart(2, '0');
     return `${yyyy}/${mm}/${dd}`;
   };
-
-  const getTime = (tz: string) =>
-    new Date().toLocaleTimeString('fa-IR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: tz,
-    });
 
   const filteredMessages = messages.filter((msg) => {
     const term = searchTerm.toLowerCase();
@@ -108,48 +169,11 @@ export default function Header() {
     );
   });
 
-  useEffect(() => {
-    const phone = localStorage.getItem('userPhone');
-    if (!phone) return;
+  // 👇 ادامه JSX هدر، اعلان‌ها، مودال‌ها و خروج مثل قبل باقی می‌مونه
+  // فقط ساعت‌ها از state `times` خونده می‌شن:
+  // times.tehran, times.tokyo, times.london, times.newyork
 
-    const profilePath = `/users/${phone}/profile.json`;
-
-    fetch(profilePath)
-      .then((res) => res.json())
-      .then((data) => {
-        setProfile(data);
-      });
-
-    fetch(`/api/message?phone=${phone}`)
-      .then((res) => res.json())
-      .then((msgs) => {
-        const validMessages = msgs.filter((m) => m && m.title && m.content);
-        const sorted = validMessages.sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        setMessages(sorted);
-      })
-      .catch((err) => {
-        console.error('❌ خطا در دریافت پیام‌ها از API:', err);
-      });
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const panel = document.getElementById('notification-panel');
-      if (panel && !panel.contains(event.target as Node)) {
-        setShowNotifications(false);
-      }
-    };
-
-    if (showNotifications) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showNotifications]);
+  // ✅ اگر خواستی کل JSX رو هم با ساعت‌های جدید برات بازنویسی کنم، فقط بگو تا در قسمت سوم برات بفرستم
   return (
     <header className="bg-gray-900 text-white px-6 py-4 shadow-md flex relative">
       {/* 📱 دکمه خروج موبایل */}
@@ -168,13 +192,13 @@ export default function Header() {
         <div>{formatGregorianDate(new Date())}</div>
         <span className="text-gray-500">|</span>
         <div className="text-xs text-gray-300 flex gap-x-3 items-center">
-          <div>تهران: {getTime('Asia/Tehran')}</div>
+          <div>تهران: {times.tehran}</div>
           <span className="text-gray-500">|</span>
-          <div>توکیو: {getTime('Asia/Tokyo')}</div>
+          <div>توکیو: {times.tokyo}</div>
           <span className="text-gray-500">|</span>
-          <div>لندن: {getTime('Europe/London')}</div>
+          <div>لندن: {times.london}</div>
           <span className="text-gray-500">|</span>
-          <div>نیویورک: {getTime('America/New_York')}</div>
+          <div>نیویورک: {times.newyork}</div>
         </div>
       </div>
 
@@ -206,7 +230,7 @@ export default function Header() {
             )}
           </button>
 
-          {/* 📨 پنل اعلان‌ها */}
+          {/* پنل اعلان‌ها */}
           {showNotifications && (
             <div
               id="notification-panel"
@@ -264,6 +288,7 @@ export default function Header() {
             </div>
           )}
         </div>
+
         {/* 👤 شناسه و نام کاربر */}
         <div className="flex flex-col items-end text-sm">
           {profile.userId ? (
@@ -279,8 +304,8 @@ export default function Header() {
         </div>
       </div>
 
-      {/* 📩 مودال پیام انتخاب‌شده */}
-      {selectedMessage && (
+      {/* 📩 مودال‌ها */}
+      {selectedMessage && /* مودال پیام انتخاب‌شده */ (
         <div className="fixed inset-0 backdrop-blur-md bg-white/10 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-md p-6 text-right">
             <h3 className="text-lg font-bold mb-2 text-gray-800">{selectedMessage.title}</h3>
@@ -298,8 +323,7 @@ export default function Header() {
         </div>
       )}
 
-      {/* 📋 مودال تمام پیام‌ها */}
-      {showAllMessages && (
+      {showAllMessages && /* مودال تمام پیام‌ها */ (
         <div className="fixed inset-0 backdrop-blur-md bg-white/10 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-lg p-6 text-right max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4 text-gray-800">تمام پیام‌ها</h3>
@@ -358,7 +382,6 @@ export default function Header() {
           </div>
         </div>
       )}
-      {/* 🗃️ مودال پیام‌های آرشیوشده */}
       {showArchivedMessages && (
         <div className="fixed inset-0 backdrop-blur-md bg-white/10 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-lg p-6 text-right max-h-[80vh] overflow-y-auto">

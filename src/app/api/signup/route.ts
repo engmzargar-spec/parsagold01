@@ -20,42 +20,31 @@ export async function POST(request: Request) {
     const usersRoot = path.join(process.cwd(), 'public', 'users');
     const identifiersPath = path.join(usersRoot, 'identifiers.json');
 
-    // ساخت پوشه users در صورت نیاز
-    if (!fs.existsSync(usersRoot)) {
-      fs.mkdirSync(usersRoot, { recursive: true });
-    }
+    // اطمینان از وجود پوشه users
+    if (!fs.existsSync(usersRoot)) fs.mkdirSync(usersRoot, { recursive: true });
 
-    // خواندن فایل identifiers.json
+    // خواندن identifiers.json
     let identifiersData: Record<string, any> = {};
     if (fs.existsSync(identifiersPath)) {
       identifiersData = JSON.parse(fs.readFileSync(identifiersPath, 'utf-8'));
     }
 
-    // بررسی تکراری بودن شماره موبایل
+    // بررسی تکراری بودن شماره
     if (identifiersData[phone]) {
       return NextResponse.json({ message: 'شماره همراه قبلاً ثبت شده است.' }, { status: 409 });
     }
 
-    // تولید شناسه یکتا
-    let userId = generateUserId();
-    while (fs.existsSync(path.join(usersRoot, userId))) {
-      userId = generateUserId();
-    }
-
-    // هش رمز عبور
+    const userId = generateUserId();
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // تاریخ عضویت
     const now = new Date();
     const joinedAtGregorian = now.toISOString().split('T')[0];
     const { jy, jm, jd } = toJalaali(now);
     const joinedAtJalali = `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`;
 
-    // ساخت پوشه اختصاصی کاربر با شماره موبایل
     const userDir = path.join(usersRoot, phone);
     fs.mkdirSync(userDir, { recursive: true });
 
-    // ذخیره اطلاعات در profile.json
     const profileData = {
       userId,
       firstName,
@@ -66,33 +55,39 @@ export async function POST(request: Request) {
       joinedAtGregorian,
       joinedAtJalali,
     };
-    fs.writeFileSync(path.join(userDir, 'profile.json'), JSON.stringify(profileData, null, 2), 'utf-8');
 
-    // ذخیره تنظیمات اولیه در settings.json
-    const settings = {
-      language: 'fa',
-      theme: 'dark',
-      notifications: true,
-    };
+    // ذخیره پروفایل
+    const profilePath = path.join(userDir, 'profile.json');
+    fs.writeFileSync(profilePath, JSON.stringify(profileData, null, 2), 'utf-8');
+
+    // ذخیره تنظیمات پیش‌فرض
+    const settings = { language: 'fa', theme: 'dark', notifications: true };
     fs.writeFileSync(path.join(userDir, 'settings.json'), JSON.stringify(settings, null, 2), 'utf-8');
 
-    // ذخیره شناسه‌ها در identifiers.json
-    identifiersData[phone] = {
-      userId,
-      email,
-      phone,
-    };
+    // به‌روزرسانی identifiers
+    identifiersData[phone] = { userId, email, phone };
     fs.writeFileSync(identifiersPath, JSON.stringify(identifiersData, null, 2), 'utf-8');
 
     // ساخت پوشه‌های جانبی
-    const subfolders = ['messages', 'transactions', 'trading', 'documents'];
+    const subfolders = ['messages', 'transactions', 'trading', 'documents', 'chart-layouts'];
     for (const folder of subfolders) {
       fs.mkdirSync(path.join(userDir, folder), { recursive: true });
     }
 
-    return NextResponse.json({ message: 'ثبت‌نام با موفقیت انجام شد.', phone });
-  } catch (error) {
+    // ارسال اطلاعات به کلاینت
+    return NextResponse.json({
+      message: 'ثبت‌نام با موفقیت انجام شد.',
+      phone,
+      userId,
+      firstName,
+      lastName,
+      email,
+    });
+  } catch (error: any) {
     console.error('Signup error:', error);
-    return NextResponse.json({ message: 'خطا در پردازش ثبت‌نام.' }, { status: 500 });
+    return NextResponse.json(
+      { message: `خطا در ثبت‌نام: ${error.message || 'مشکلی پیش آمد.'}` },
+      { status: 500 }
+    );
   }
 }

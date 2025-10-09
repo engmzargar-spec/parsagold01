@@ -35,7 +35,7 @@ export default function LoginPage() {
 
     if (captchaInput.toLowerCase() !== captchaCode.toLowerCase()) {
       setError('کد کپچا اشتباه است.');
-      setCaptchaCode(generateCaptcha()); // 🔄 رفرش کپچا
+      setCaptchaCode(generateCaptcha());
       return;
     }
 
@@ -50,27 +50,20 @@ export default function LoginPage() {
 
       if (!res.ok) {
         setError(result.message || 'ورود ناموفق بود.');
-        setCaptchaCode(generateCaptcha()); // 🔄 رفرش کپچا
+        setCaptchaCode(generateCaptcha());
         return;
       }
 
-      localStorage.setItem('userPhone', result.phone);
+      // ذخیره شماره موبایل در sessionStorage برای استفاده در UserContext
+      sessionStorage.setItem('loginPhone', result.phone);
 
-      await fetch('/api/message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: result.phone,
-          type: 'login',
-          title: 'ورود موفق',
-          content: `خوش آمدید ${result.firstName} عزیز! ورود شما با موفقیت انجام شد.`,
-        }),
-      });
-
-      router.push('/dashboard');
+      // هدایت به داشبورد بعد از تأخیر کوتاه تا UserContext مقداردهی شود
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 300);
     } catch (err) {
       setError('ارتباط با سرور برقرار نشد.');
-      setCaptchaCode(generateCaptcha()); // 🔄 رفرش کپچا
+      setCaptchaCode(generateCaptcha());
     }
   };
 
@@ -123,12 +116,6 @@ export default function LoginPage() {
               >
                 <ArrowPathIcon className="w-5 h-5 text-yellow-400" />
               </button>
-            </div>
-
-            <div className="text-right">
-              <Link href="/forgot-password" className="text-yellow-400 underline hover:text-yellow-300 text-sm">
-                رمز عبور را فراموش کرده‌اید؟
-              </Link>
             </div>
 
             <button

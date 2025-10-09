@@ -93,27 +93,28 @@ export default function SignupPage() {
         return;
       }
 
-      // پیام خوش‌آمدگویی
+      sessionStorage.setItem('loginPhone', result.phone);
+
       await fetch('/api/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone: payload.phone,
+          phone: result.phone,
           type: 'signup',
-          title: `خوش آمدید ${payload.firstName} ${payload.lastName} عزیز`,
+          title: `خوش آمدید ${result.firstName} ${result.lastName} عزیز`,
           content: `ثبت‌نام شما با موفقیت انجام شد. لطفاً وارد شوید.`,
           timestamp: new Date().toISOString(),
           read: false,
         }),
       });
 
-      // هدایت به صفحه لاگین
-      router.push('/login');
+      setTimeout(() => {
+        router.push('/login');
+      }, 300);
     } catch (err) {
       setError('ارتباط با سرور برقرار نشد.');
     }
   };
-
   return (
     <main dir="rtl" className="relative min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex items-center justify-center px-4 py-10">
       <Link href="/" className="absolute top-6 right-6 text-yellow-400 hover:text-yellow-300 flex items-center gap-2">

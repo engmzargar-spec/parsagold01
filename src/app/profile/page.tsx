@@ -1,57 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-type User = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  joinedAtJalali?: string;
-  accountNumber?: string;
-  nationalCode?: string;
-  address?: string;
-  role?: string;
-  verified?: boolean;
-  documentFileName?: string;
-};
+import { useUser } from '@/context/UserContext';
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [error, setError] = useState('');
+  const { user } = useUser();
   const router = useRouter();
 
-  useEffect(() => {
-    const phone = localStorage.getItem('userPhone');
-    if (!phone) {
-      setError('شماره همراه کاربر یافت نشد. لطفاً ابتدا وارد شوید.');
-      return;
-    }
-
-    const filePath = `/users/${phone}/profile.json`;
-
-    fetch(filePath)
-      .then((res) => {
-        if (!res.ok) throw new Error('فایل کاربر یافت نشد.');
-        return res.json();
-      })
-      .then((data) => setUser(data))
-      .catch((err) => setError(err.message));
-  }, []);
-
-  if (error) {
-    return (
-      <main dir="rtl" className="min-h-screen flex items-center justify-center bg-black text-white p-6">
-        <div className="bg-red-900 bg-opacity-60 backdrop-blur-md p-6 rounded-xl shadow-xl text-center">
-          <h2 className="text-xl font-bold mb-4 text-yellow-400">خطا</h2>
-          <p>{error}</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!user) {
+  if (user === null) {
     return (
       <main dir="rtl" className="min-h-screen flex items-center justify-center bg-black text-white p-6">
         <p className="text-yellow-400 animate-pulse">در حال بارگذاری اطلاعات کاربر...</p>
@@ -59,8 +15,20 @@ export default function ProfilePage() {
     );
   }
 
-  const documentPath = `/users/${user.phone}/documents/${user.documentFileName}`;
+  if (!user?.phone) {
+    return (
+      <main dir="rtl" className="min-h-screen flex items-center justify-center bg-black text-white p-6">
+        <div className="bg-red-900 bg-opacity-60 backdrop-blur-md p-6 rounded-xl shadow-xl text-center">
+          <h2 className="text-xl font-bold mb-4 text-yellow-400">خطا</h2>
+          <p>شماره همراه کاربر یافت نشد. لطفاً ابتدا وارد شوید.</p>
+        </div>
+      </main>
+    );
+  }
 
+  const documentPath = user.documentFileName
+    ? `/users/${user.phone}/documents/${user.documentFileName}`
+    : null;
   return (
     <main dir="rtl" className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white p-6 flex flex-col items-center justify-center">
       <div className="bg-white/10 backdrop-blur-md rounded-xl shadow-xl p-8 w-full max-w-2xl mb-6">
@@ -70,7 +38,7 @@ export default function ProfilePage() {
           <Info label="نام خانوادگی" value={user.lastName} />
           <Info label="ایمیل" value={user.email} />
           <Info label="شماره همراه" value={user.phone} />
-          <Info label="تاریخ عضویت" value={user.joinedAtJalali} wide />
+          {user.joinedAtJalali && <Info label="تاریخ عضویت" value={user.joinedAtJalali} wide />}
           {user.accountNumber && <Info label="شماره حساب" value={user.accountNumber} />}
           {user.nationalCode && <Info label="کد ملی" value={user.nationalCode} />}
           {user.address && <Info label="آدرس" value={user.address} wide />}
@@ -80,7 +48,7 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {user.documentFileName && (
+        {documentPath && (
           <div className="mt-10 text-center">
             <h3 className="text-lg font-bold text-yellow-400 mb-4">مدرک شناسایی</h3>
             <img
