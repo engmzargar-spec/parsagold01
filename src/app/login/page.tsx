@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [captchaInput, setCaptchaInput] = useState('');
   const [captchaCode, setCaptchaCode] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     setCaptchaCode(generateCaptcha());
@@ -32,6 +33,7 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     if (captchaInput.toLowerCase() !== captchaCode.toLowerCase()) {
       setError('کد کپچا اشتباه است.');
@@ -46,6 +48,13 @@ export default function LoginPage() {
         body: JSON.stringify({ phone, password }),
       });
 
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        setError('پاسخ سرور معتبر نبود. لطفاً دوباره تلاش کنید.');
+        setCaptchaCode(generateCaptcha());
+        return;
+      }
+
       const result = await res.json();
 
       if (!res.ok) {
@@ -54,13 +63,27 @@ export default function LoginPage() {
         return;
       }
 
-      // ذخیره شماره موبایل در sessionStorage برای استفاده در UserContext
-      sessionStorage.setItem('loginPhone', result.phone);
+      const user = result.user || {};
+      const loginPhone = result.phone || user.phone || '';
+      sessionStorage.setItem('loginPhone', loginPhone);
 
-      // هدایت به داشبورد بعد از تأخیر کوتاه تا UserContext مقداردهی شود
+      await fetch('/api/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: user.phone,
+          type: 'login',
+          title: `ورود موفق`,
+          content: `سلام ${user.firstName || ''} ${user.lastName || ''} عزیز، خوش آمدید.`,
+          read: false,
+        }),
+      });
+
+      setSuccess(result.message || 'ورود با موفقیت انجام شد');
+
       setTimeout(() => {
         router.push('/dashboard');
-      }, 300);
+      }, 1000);
     } catch (err) {
       setError('ارتباط با سرور برقرار نشد.');
       setCaptchaCode(generateCaptcha());
@@ -126,6 +149,7 @@ export default function LoginPage() {
             </button>
 
             {error && <p className="text-red-400 text-sm text-right mt-2">{error}</p>}
+            {success && <p className="text-green-400 text-sm text-right mt-2">{success}</p>}
           </form>
         </div>
 

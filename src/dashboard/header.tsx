@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BellIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
-import { toJalaali } from 'jalaali-js';
+import jalaali from 'jalaali-js';
 
 export default function Header() {
   const router = useRouter();
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAllMessages, setShowAllMessages] = useState(false);
   const [showArchivedMessages, setShowArchivedMessages] = useState(false);
@@ -22,51 +23,6 @@ export default function Header() {
   });
 
   const unreadCount = messages.filter((msg) => !msg.read && !msg.archived).length;
-
-  const handleArchive = async (msgId: number) => {
-  const phone = sessionStorage.getItem('loginPhone');
-  if (!phone) return;
-
-  try {
-    await fetch('/api/message/archive', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, id: msgId }),
-    });
-
-    const updated = messages.map((msg) =>
-      msg.id === msgId ? { ...msg, archived: true } : msg
-    );
-    setMessages(updated);
-  } catch (err) {
-    console.error('❌ خطا در آرشیو پیام:', err);
-  }
-};
- 
-  const handleMessageClick = async (msgId: number) => {
-  const phone = sessionStorage.getItem('loginPhone');
-  if (!phone) return;
-
-  try {
-    await fetch('/api/message', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, id: msgId }),
-    });
-  } catch (err) {
-    console.error('❌ خطا در بروزرسانی پیام:', err);
-  }
-
-  const updated = messages.map((msg) =>
-    msg.id === msgId ? { ...msg, read: true } : msg
-  );
-  setMessages(updated);
-
-  const selected = updated.find((msg) => msg.id === msgId);
-  setSelectedMessage(selected || null);
-  setShowAllMessages(false);
-  setShowArchivedMessages(false);
-};
 
   const handleLogout = () => {
     sessionStorage.removeItem('loginPhone');
@@ -95,26 +51,79 @@ export default function Header() {
     const interval = setInterval(updateTimes, 60000);
     return () => clearInterval(interval);
   }, []);
-  useEffect(() => {
-    const phone = typeof window !== 'undefined' ? sessionStorage.getItem('loginPhone') : null;
+  const handleArchive = async (msgId: number) => {
+    const phone = sessionStorage.getItem('loginPhone');
     if (!phone) return;
 
-    const profilePath = `/users/${phone}/profile.json`;
+    try {
+      await fetch('/api/messages/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, id: msgId }),
+      });
 
-    fetch(profilePath)
-      .then((res) => res.json())
-      .then((data) => setProfile(data));
+      const updated = messages.map((msg) =>
+        msg.id === msgId ? { ...msg, archived: true } : msg
+      );
+      setMessages(updated);
+    } catch (err) {
+      console.error('❌ خطا در آرشیو پیام:', err);
+    }
+  };
 
-    fetch(`/api/message?phone=${phone}`)
-      .then((res) => res.json())
-      .then((msgs) => {
-        const validMessages = msgs.filter((m) => m && m.title && m.content);
+  const handleMessageClick = async (msgId: number) => {
+    const phone = sessionStorage.getItem('loginPhone');
+    if (!phone) return;
+
+    try {
+      await fetch('/api/messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, id: msgId }),
+      });
+    } catch (err) {
+      console.error('❌ خطا در بروزرسانی پیام:', err);
+    }
+
+    const updated = messages.map((msg) =>
+      msg.id === msgId ? { ...msg, read: true } : msg
+    );
+    setMessages(updated);
+
+    const selected = updated.find((msg) => msg.id === msgId);
+    setSelectedMessage(selected || null);
+    setShowAllMessages(false);
+    setShowArchivedMessages(false);
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const phone = typeof window !== 'undefined' ? sessionStorage.getItem('loginPhone') : null;
+      if (!phone) return;
+
+      try {
+        const profileRes = await fetch(`/users/${phone}/profile.json`);
+        const profileData = await profileRes.json();
+        setProfile(profileData);
+      } catch (err) {
+        console.error('❌ خطا در دریافت پروفایل:', err);
+      }
+
+      try {
+        const msgRes = await fetch(`/api/messages?phone=${phone}`);
+        const msgData = await msgRes.json();
+        const list = Array.isArray(msgData.messages) ? msgData.messages : [];
+        const validMessages = list.filter((m) => m && m.title && m.content);
         const sorted = validMessages.sort(
           (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
         setMessages(sorted);
-      })
-      .catch((err) => console.error('❌ خطا در دریافت پیام‌ها:', err));
+      } catch (err) {
+        console.error('❌ خطا در دریافت پیام‌ها:', err);
+      }
+    };
+
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -133,11 +142,10 @@ export default function Header() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showNotifications]);
-
   const formatJalaliDate = (iso: string) => {
     const date = new Date(iso);
-    const j = toJalaali(date);
-    return `${j.jy}/${String(j.jm).padStart(2, '0')}/${String(j.jd).padStart(2, '0')}`;
+    const { jy, jm, jd } = jalaali.toJalaali(date);
+    return `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`;
   };
 
   const formatGregorianDate = (date: Date) => {
@@ -169,11 +177,6 @@ export default function Header() {
     );
   });
 
-  // 👇 ادامه JSX هدر، اعلان‌ها، مودال‌ها و خروج مثل قبل باقی می‌مونه
-  // فقط ساعت‌ها از state `times` خونده می‌شن:
-  // times.tehran, times.tokyo, times.london, times.newyork
-
-  // ✅ اگر خواستی کل JSX رو هم با ساعت‌های جدید برات بازنویسی کنم، فقط بگو تا در قسمت سوم برات بفرستم
   return (
     <header className="bg-gray-900 text-white px-6 py-4 shadow-md flex relative">
       {/* 📱 دکمه خروج موبایل */}
@@ -215,7 +218,6 @@ export default function Header() {
         >
           خروج
         </button>
-
         {/* 🔔 زنگوله اعلان‌ها */}
         <div className="relative">
           <button
@@ -230,7 +232,6 @@ export default function Header() {
             )}
           </button>
 
-          {/* پنل اعلان‌ها */}
           {showNotifications && (
             <div
               id="notification-panel"
@@ -304,8 +305,8 @@ export default function Header() {
         </div>
       </div>
 
-      {/* 📩 مودال‌ها */}
-      {selectedMessage && /* مودال پیام انتخاب‌شده */ (
+      {/* 📩 مودال پیام انتخاب‌شده */}
+      {selectedMessage && (
         <div className="fixed inset-0 backdrop-blur-md bg-white/10 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-md p-6 text-right">
             <h3 className="text-lg font-bold mb-2 text-gray-800">{selectedMessage.title}</h3>
@@ -323,7 +324,8 @@ export default function Header() {
         </div>
       )}
 
-      {showAllMessages && /* مودال تمام پیام‌ها */ (
+      {/* 📩 مودال تمام پیام‌ها */}
+      {showAllMessages && (
         <div className="fixed inset-0 backdrop-blur-md bg-white/10 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-lg p-6 text-right max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4 text-gray-800">تمام پیام‌ها</h3>
@@ -381,7 +383,9 @@ export default function Header() {
             </div>
           </div>
         </div>
-      )}
+            )}
+
+      {/* 📩 مودال پیام‌های آرشیوشده */}
       {showArchivedMessages && (
         <div className="fixed inset-0 backdrop-blur-md bg-white/10 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-lg p-6 text-right max-h-[80vh] overflow-y-auto">

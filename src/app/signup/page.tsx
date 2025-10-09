@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { HomeIcon } from '@heroicons/react/24/solid';
 import { useRouter } from 'next/navigation';
-import { toJalaali } from 'jalaali-js';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -62,21 +61,14 @@ export default function SignupPage() {
       return;
     }
 
-    const now = new Date();
-    const joinedAtGregorian = now.toISOString().split('T')[0];
-    const { jy, jm, jd } = toJalaali(now);
-    const joinedAtJalali = `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`;
-
     const sanitizedPhone = sanitize(form.phone);
 
     const payload = {
       firstName: sanitize(form.firstName),
       lastName: sanitize(form.lastName),
-      email: sanitize(form.email),
+      email: sanitize(form.email || ''),
       phone: sanitizedPhone,
       password: form.password,
-      joinedAtGregorian,
-      joinedAtJalali,
     };
 
     try {
@@ -85,6 +77,12 @@ export default function SignupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        setError('پاسخ سرور معتبر نبود. لطفاً دوباره تلاش کنید.');
+        return;
+      }
 
       const result = await res.json();
 
@@ -103,7 +101,6 @@ export default function SignupPage() {
           type: 'signup',
           title: `خوش آمدید ${result.firstName} ${result.lastName} عزیز`,
           content: `ثبت‌نام شما با موفقیت انجام شد. لطفاً وارد شوید.`,
-          timestamp: new Date().toISOString(),
           read: false,
         }),
       });
@@ -115,6 +112,7 @@ export default function SignupPage() {
       setError('ارتباط با سرور برقرار نشد.');
     }
   };
+
   return (
     <main dir="rtl" className="relative min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex items-center justify-center px-4 py-10">
       <Link href="/" className="absolute top-6 right-6 text-yellow-400 hover:text-yellow-300 flex items-center gap-2">

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcrypt';
+import moment from 'moment-jalaali';
 
 export async function POST(request: Request) {
   try {
@@ -32,21 +33,54 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'رمز عبور اشتباه است.' }, { status: 401 });
     }
 
-    // حذف رمز از حافظه برای امنیت بیشتر
+    // حذف رمز عبور از داده‌های برگشتی
     delete userData.password;
 
-    // ارسال اطلاعات کامل برای Context
     const safeUserData = {
       phone: userData.phone,
       firstName: userData.firstName || '',
       lastName: userData.lastName || '',
       email: userData.email || '',
-      userId: userData.userId || '', // اضافه شد برای هماهنگی با UserContext
+      userId: userData.userId || '',
     };
 
-    return NextResponse.json(safeUserData);
+    // ساخت پیام ورود
+    const messagesDir = path.join(userDir, 'messages');
+    if (!fs.existsSync(messagesDir)) {
+      fs.mkdirSync(messagesDir, { recursive: true });
+    }
+
+    const now = moment();
+    const jalaliDate = now.format('jYYYYjMMjDD');
+    const time = now.format('HH-mm-ss');
+    const filename = `login-${jalaliDate}-${time}-${Date.now()}.json`;
+    const filePath = path.join(messagesDir, filename);
+
+    const loginMessage = {
+      id: Date.now(),
+      type: 'login',
+      title: 'ورود موفق',
+      content: `کاربر ${safeUserData.firstName} ${safeUserData.lastName} با شناسه ${safeUserData.userId} وارد شد.`,
+      timestamp: now.toISOString(),
+      read: false,
+    };
+
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(loginMessage, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('❌ خطا در ذخیره پیام ورود:', err);
+    }
+
+    return NextResponse.json(
+      {
+        message: 'ورود موفقیت‌آمیز بود',
+        user: safeUserData,
+        phone: safeUserData.phone, // ✅ برای sessionStorage در کلاینت
+      },
+      { status: 200 }
+    );
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('❌ Login error:', error);
     return NextResponse.json(
       { message: 'خطا در پردازش ورود.' },
       { status: 500 }

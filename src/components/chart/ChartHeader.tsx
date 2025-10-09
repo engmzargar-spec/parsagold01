@@ -3,17 +3,17 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 const marketSessions = [
-  { name: 'Sydney', openUTC: 22, closeUTC: 6 },
-  { name: 'Tokyo', openUTC: 0, closeUTC: 8 },
-  { name: 'London', openUTC: 7, closeUTC: 15 },
   { name: 'New York', openUTC: 12, closeUTC: 20 },
+  { name: 'London', openUTC: 7, closeUTC: 15 },
+  { name: 'Tokyo', openUTC: 0, closeUTC: 8 },
+  { name: 'Sydney', openUTC: 22, closeUTC: 6 },
 ];
 
 const getMarketProgress = (openUTC: number, closeUTC: number) => {
   const nowUTC = new Date().getUTCHours();
   const duration = (closeUTC + 24 - openUTC) % 24;
   const elapsed = (nowUTC + 24 - openUTC) % 24;
-  if (elapsed < 0 || elapsed >= duration) return 0;
+  if (elapsed < 0 || elapsed >= duration) return 1;
   return Math.min(1, elapsed / duration);
 };
 
@@ -26,14 +26,35 @@ const getMarketDirection = (openUTC: number, closeUTC: number) => {
   return 'active';
 };
 
+const formatTime = (hours: number) => {
+  const rounded = Math.max(0, Math.round(hours * 60)); // تبدیل به دقیقه
+  const h = Math.floor(rounded / 60);
+  const m = rounded % 60;
+  return `${h} ساعت و ${m} دقیقه`;
+};
+
+const getTimeUntilClose = (openUTC: number, closeUTC: number) => {
+  const nowUTC = new Date().getUTCHours() + new Date().getMinutes() / 60;
+  const duration = (closeUTC + 24 - openUTC) % 24;
+  const elapsed = (nowUTC + 24 - openUTC) % 24;
+  const remaining = duration - elapsed;
+  return remaining <= 0 ? 0 : remaining;
+};
+
+const getTimeUntilOpen = (openUTC: number) => {
+  const nowUTC = new Date().getUTCHours() + new Date().getMinutes() / 60;
+  const hoursUntilOpen = (openUTC + 24 - nowUTC) % 24;
+  return hoursUntilOpen;
+};
+
 export default function ChartHeader({ onSave }: { onSave: () => void }) {
   const router = useRouter();
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTick((prev) => prev + 1); // فقط برای رفرش کامپوننت
-    }, 60000); // هر 60 ثانیه
+      setTick((prev) => prev + 1);
+    }, 60000);
 
     return () => clearInterval(interval);
   }, []);
@@ -45,31 +66,30 @@ export default function ChartHeader({ onSave }: { onSave: () => void }) {
         {marketSessions.map((session) => {
           const progress = getMarketProgress(session.openUTC, session.closeUTC);
           const direction = getMarketDirection(session.openUTC, session.closeUTC);
-          const greenWidth = `${Math.round(progress * 100)}%`;
-          const redWidth = `${100 - Math.round(progress * 100)}%`;
+          const redWidth = `${Math.round(progress * 100)}%`;
+          const greenWidth = `${100 - Math.round(progress * 100)}%`;
+          const statusLabel = progress >= 1 ? 'closed' : 'open';
+
+          let tooltip = '';
+          if (direction === 'active') {
+            const hoursLeft = getTimeUntilClose(session.openUTC, session.closeUTC);
+            tooltip = `تا بسته شدن بازار: ${formatTime(hoursLeft)}`;
+          } else {
+            const hoursToOpen = getTimeUntilOpen(session.openUTC);
+            tooltip = `تا باز شدن بازار: ${formatTime(hoursToOpen)}`;
+          }
 
           return (
             <div key={session.name} className="flex flex-col items-center w-24">
-              <div className="text-white mb-0.5">{session.name}</div>
-              <div className="w-full h-2 flex rounded overflow-hidden border border-gray-600">
-                {direction === 'pre' && (
-                  <>
-                    <div style={{ width: greenWidth }} className="bg-green-600"></div>
-                    <div style={{ width: redWidth }} className="bg-red-700"></div>
-                  </>
-                )}
-                {direction === 'post' && (
-                  <>
-                    <div style={{ width: redWidth }} className="bg-red-700"></div>
-                    <div style={{ width: greenWidth }} className="bg-green-600"></div>
-                  </>
-                )}
-                {direction === 'active' && (
-                  <>
-                    <div style={{ width: redWidth }} className="bg-red-700"></div>
-                    <div style={{ width: greenWidth }} className="bg-green-600"></div>
-                  </>
-                )}
+              <div className="text-white mb-0.5">
+                {session.name} <span className="text-gray-400">({statusLabel})</span>
+              </div>
+              <div
+                className="w-full h-2 flex rounded overflow-hidden border border-gray-600"
+                title={tooltip}
+              >
+                <div style={{ width: greenWidth }} className="bg-green-600"></div>
+                <div style={{ width: redWidth }} className="bg-red-700"></div>
               </div>
             </div>
           );
