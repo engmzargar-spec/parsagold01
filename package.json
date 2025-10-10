@@ -14,6 +14,7 @@
     "cheerio": "^1.1.2",
     "dayjs": "^1.11.18",
     "dayjs-jalali": "^0.0.2",
+    "geoip-lite": "^1.4.10",
     "jalaali-js": "^1.2.8",
     "moment-jalaali": "^0.10.4",
     "next": "15.5.4",
@@ -22,6 +23,7 @@
     "react-countup": "^6.5.3",
     "react-dom": "19.1.0",
     "react-icons": "^5.5.0",
+    "react-select": "^5.10.2",
     "react-tsparticles": "^2.12.2",
     "tsparticles": "^3.9.1"
   },

@@ -35,17 +35,16 @@ export default function LoginPage() {
     setError('');
     setSuccess('');
 
-    if (captchaInput.toLowerCase() !== captchaCode.toLowerCase()) {
-      setError('کد کپچا اشتباه است.');
-      setCaptchaCode(generateCaptcha());
-      return;
-    }
-
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, password }),
+        body: JSON.stringify({
+          phone,
+          password,
+          captchaInput,
+          captchaCode,
+        }),
       });
 
       const contentType = res.headers.get('content-type');
@@ -118,6 +117,13 @@ export default function LoginPage() {
               required
               className="w-full px-4 py-3 rounded-md bg-gray-800 text-white placeholder-gray-400 text-right focus:outline-none focus:ring-2 focus:ring-yellow-500"
             />
+
+            {/* لینک فراموشی رمز عبور */}
+            <div className="text-right text-xs text-gray-400 mt-1">
+              <Link href="/forgot-password" className="hover:text-yellow-400 transition-colors">
+                فراموشی رمز عبور؟
+              </Link>
+            </div>
 
             <div className="flex items-center gap-2">
               <input

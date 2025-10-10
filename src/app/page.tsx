@@ -10,7 +10,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const buttonStyle =
-    'px-4 py-1 border border-[#FFD700] text-[#FFD700] font-semibold rounded-full shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95 hover:bg-gradient-to-r hover:from-[#FFE066] hover:to-[#FFD700] hover:text-black text-sm';
+    'px-4 py-1 border border-[#FFD700] text-[#FFD700] font-semibold rounded-md shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95 hover:bg-gradient-to-r hover:from-[#FFE066] hover:to-[#FFD700] hover:text-black text-sm';
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-800 to-gray-900 text-white flex flex-col items-center p-4">
@@ -26,22 +26,25 @@ export default function Home() {
           </button>
         </div>
 
-        {/* منوی همبرگری در موبایل */}
+        {/* دکمه همبرگری فقط در موبایل */}
         <div className="sm:hidden">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="text-[#FFD700] border border-[#FFD700] px-3 py-1 rounded-full"
+            className="text-[#FFD700] border border-[#FFD700] px-3 py-1 rounded-md"
           >
             ☰ منو
           </button>
         </div>
 
-        {/* لینک‌ها در دسکتاپ */}
-        <div className="hidden sm:flex flex-wrap gap-2 justify-end">
-          <a href="/rules"><button className={buttonStyle}>قوانین و مقررات</button></a>
-          <a href="/faq"><button className={buttonStyle}>سئوالات متداول</button></a>
-          <a href="/about"><button className={buttonStyle}>درباره ما</button></a>
-          <a href="/contact"><button className={buttonStyle}>تماس با ما</button></a>
+        {/* لینک‌های متنی با جداکننده طلایی در دسکتاپ */}
+        <div className="hidden sm:flex items-center gap-2 text-[#FFD700] text-sm">
+          <a href="/rules" className="hover:text-yellow-300">قوانین و مقررات</a>
+          <span className="h-4 w-px bg-[#FFD700]" />
+          <a href="/faq" className="hover:text-yellow-300">سئوالات متداول</a>
+          <span className="h-4 w-px bg-[#FFD700]" />
+          <a href="/about" className="hover:text-yellow-300">درباره ما</a>
+          <span className="h-4 w-px bg-[#FFD700]" />
+          <a href="/contact" className="hover:text-yellow-300">تماس با ما</a>
         </div>
       </div>
 

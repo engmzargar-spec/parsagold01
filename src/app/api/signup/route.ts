@@ -9,14 +9,24 @@ function generateUserId() {
   return `PG-${random}`;
 }
 
+function normalizePhone(phone: string): string {
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('00')) return cleaned;
+  if (cleaned.startsWith('0')) return '0098' + cleaned.slice(1);
+  if (cleaned.length === 10) return '0098' + cleaned;
+  return '00' + cleaned;
+}
+
 export async function POST(request: Request) {
   try {
-    const { firstName, lastName, email = '', phone, password } = await request.json();
+    const body = await request.json();
+    const { firstName, lastName, email = '', phone, password } = body;
 
     if (!firstName || !lastName || !phone || !password) {
       return NextResponse.json({ message: 'همه فیلدهای ضروری باید پر شوند.' }, { status: 400 });
     }
 
+    const normalizedPhone = normalizePhone(phone);
     const usersRoot = path.join(process.cwd(), 'public', 'users');
     const identifiersPath = path.join(usersRoot, 'identifiers.json');
 
@@ -24,10 +34,14 @@ export async function POST(request: Request) {
 
     let identifiersData: Record<string, any> = {};
     if (fs.existsSync(identifiersPath)) {
-      identifiersData = JSON.parse(fs.readFileSync(identifiersPath, 'utf-8'));
+      try {
+        identifiersData = JSON.parse(fs.readFileSync(identifiersPath, 'utf-8'));
+      } catch {
+        identifiersData = {};
+      }
     }
 
-    if (identifiersData[phone]) {
+    if (identifiersData[normalizedPhone]) {
       return NextResponse.json({ message: 'شماره همراه قبلاً ثبت شده است.' }, { status: 409 });
     }
 
@@ -39,7 +53,7 @@ export async function POST(request: Request) {
     const { jy, jm, jd } = toJalaali(now);
     const joinedAtJalali = `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`;
 
-    const userDir = path.join(usersRoot, phone);
+    const userDir = path.join(usersRoot, normalizedPhone);
     fs.mkdirSync(userDir, { recursive: true });
 
     const profileData = {
@@ -47,19 +61,25 @@ export async function POST(request: Request) {
       firstName,
       lastName,
       email,
-      phone,
+      phone: normalizedPhone,
       password: hashedPassword,
       joinedAtGregorian,
       joinedAtJalali,
     };
 
-    const profilePath = path.join(userDir, 'profile.json');
-    fs.writeFileSync(profilePath, JSON.stringify(profileData, null, 2), 'utf-8');
+    fs.writeFileSync(path.join(userDir, 'profile.json'), JSON.stringify(profileData, null, 2), 'utf-8');
 
     const settings = { language: 'fa', theme: 'dark', notifications: true };
     fs.writeFileSync(path.join(userDir, 'settings.json'), JSON.stringify(settings, null, 2), 'utf-8');
 
-    identifiersData[phone] = { userId, email, phone };
+    identifiersData[normalizedPhone] = {
+      userId,
+      email,
+      phone: normalizedPhone,
+      joinedAtGregorian,
+      joinedAtJalali,
+    };
+
     fs.writeFileSync(identifiersPath, JSON.stringify(identifiersData, null, 2), 'utf-8');
 
     const subfolders = ['messages', 'transactions', 'trading', 'documents', 'chart-layouts'];
@@ -69,7 +89,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       message: 'ثبت‌نام با موفقیت انجام شد.',
-      phone,
+      phone: normalizedPhone,
       userId,
       firstName,
       lastName,

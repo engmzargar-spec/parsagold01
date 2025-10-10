@@ -4,19 +4,48 @@ import path from 'path';
 import bcrypt from 'bcrypt';
 import moment from 'moment-jalaali';
 
+function normalizePhone(phone: string): string {
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('0')) return '0098' + cleaned.slice(1);
+  if (cleaned.length === 10) return '0098' + cleaned;
+  return cleaned;
+}
+
 export async function POST(request: Request) {
   try {
-    const { phone, password } = await request.json();
+    const body = await request.json();
+    const { phone, password, captchaInput, captchaCode } = body;
 
-    if (!phone || !password) {
+    // بررسی کامل بودن فیلدها
+    if (
+      typeof phone !== 'string' ||
+      typeof password !== 'string' ||
+      typeof captchaInput !== 'string' ||
+      typeof captchaCode !== 'string' ||
+      !phone.trim() ||
+      !password.trim() ||
+      !captchaInput.trim() ||
+      !captchaCode.trim()
+    ) {
       return NextResponse.json(
-        { message: 'شماره همراه و رمز عبور الزامی هستند.' },
+        { message: 'همه فیلدها از جمله کد امنیتی الزامی هستند.' },
         { status: 400 }
       );
     }
 
+    // بررسی کپچا بدون حساسیت به حروف
+    if (captchaInput.trim().toLowerCase() !== captchaCode.trim().toLowerCase()) {
+      return NextResponse.json(
+        { message: 'کد امنیتی اشتباه است.' },
+        { status: 403 }
+      );
+    }
+
+    // تبدیل شماره داخلی به بین‌المللی
+    const normalizedPhone = normalizePhone(phone);
+
     const usersRoot = path.join(process.cwd(), 'public', 'users');
-    const userDir = path.join(usersRoot, phone);
+    const userDir = path.join(usersRoot, normalizedPhone);
     const profilePath = path.join(userDir, 'profile.json');
 
     if (!fs.existsSync(profilePath)) {
@@ -27,13 +56,11 @@ export async function POST(request: Request) {
     }
 
     const userData = JSON.parse(fs.readFileSync(profilePath, 'utf-8'));
-
     const isPasswordValid = await bcrypt.compare(password, userData.password);
     if (!isPasswordValid) {
       return NextResponse.json({ message: 'رمز عبور اشتباه است.' }, { status: 401 });
     }
 
-    // حذف رمز عبور از داده‌های برگشتی
     delete userData.password;
 
     const safeUserData = {
@@ -44,7 +71,7 @@ export async function POST(request: Request) {
       userId: userData.userId || '',
     };
 
-    // ساخت پیام ورود
+    // ذخیره پیام ورود
     const messagesDir = path.join(userDir, 'messages');
     if (!fs.existsSync(messagesDir)) {
       fs.mkdirSync(messagesDir, { recursive: true });
@@ -75,7 +102,7 @@ export async function POST(request: Request) {
       {
         message: 'ورود موفقیت‌آمیز بود',
         user: safeUserData,
-        phone: safeUserData.phone, // ✅ برای sessionStorage در کلاینت
+        phone: safeUserData.phone,
       },
       { status: 200 }
     );
