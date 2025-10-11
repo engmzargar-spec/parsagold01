@@ -26,27 +26,34 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
     const phone = sessionStorage.getItem('loginPhone');
     if (!phone) {
-      setUser({});
+      console.warn('📵 شماره‌ای در sessionStorage نیست');
+      setUser(null);
       return;
     }
 
-    fetch(`/users/${phone}/profile.json`)
+    fetch(`/api/profile?phone=${phone}`)
       .then((res) => {
-        if (!res.ok) throw new Error('فایل پروفایل یافت نشد');
+        if (!res.ok) {
+          console.warn('⚠️ فایل پروفایل یافت نشد');
+          setUser(null);
+          return null;
+        }
         return res.json();
       })
       .then((data) => {
-        setUser({
-          phone,
-          userId: data.userId,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-        });
+        if (data) {
+          setUser({
+            phone,
+            userId: data.userId,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+          });
+        }
       })
       .catch((err) => {
         console.error('❌ خطا در بارگذاری اطلاعات کاربر:', err);
-        setUser({});
+        setUser(null);
       });
   }, []);
 

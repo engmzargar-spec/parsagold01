@@ -3,20 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcrypt';
 import moment from 'moment-jalaali';
-
-function normalizePhone(phone: string): string {
-  let cleaned = phone.replace(/\D/g, '');
-  if (cleaned.startsWith('0')) return '0098' + cleaned.slice(1);
-  if (cleaned.length === 10) return '0098' + cleaned;
-  return cleaned;
-}
+import { getGeoInfo } from '@/utils/getGeoInfo';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { phone, password, captchaInput, captchaCode } = body;
 
-    // بررسی کامل بودن فیلدها
     if (
       typeof phone !== 'string' ||
       typeof password !== 'string' ||
@@ -33,26 +26,25 @@ export async function POST(request: Request) {
       );
     }
 
-    // بررسی کپچا بدون حساسیت به حروف
     if (captchaInput.trim().toLowerCase() !== captchaCode.trim().toLowerCase()) {
-      return NextResponse.json(
-        { message: 'کد امنیتی اشتباه است.' },
-        { status: 403 }
-      );
+      return NextResponse.json({ message: 'کد امنیتی اشتباه است.' }, { status: 403 });
     }
 
-    // تبدیل شماره داخلی به بین‌المللی
-    const normalizedPhone = normalizePhone(phone);
+    // تشخیص کشور از locale مرورگر یا آی‌پی
+    const ip = request.headers.get('x-forwarded-for')?.toString() || request.socket.remoteAddress?.toString();
+    const geo = getGeoInfo(ip);
+    const countryCode = geo.country === 'IR' ? '0098' : '00' + geo.country; // پیش‌فرض ایران
+
+    // ساخت شماره بین‌المللی
+    const cleanedPhone = phone.replace(/\D/g, '').replace(/^0/, '');
+    const fullPhone = countryCode + cleanedPhone;
 
     const usersRoot = path.join(process.cwd(), 'public', 'users');
-    const userDir = path.join(usersRoot, normalizedPhone);
+    const userDir = path.join(usersRoot, fullPhone);
     const profilePath = path.join(userDir, 'profile.json');
 
     if (!fs.existsSync(profilePath)) {
-      return NextResponse.json(
-        { message: 'کاربری با این شماره همراه یافت نشد.' },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: 'کاربری با این شماره همراه یافت نشد.' }, { status: 404 });
     }
 
     const userData = JSON.parse(fs.readFileSync(profilePath, 'utf-8'));
@@ -71,7 +63,6 @@ export async function POST(request: Request) {
       userId: userData.userId || '',
     };
 
-    // ذخیره پیام ورود
     const messagesDir = path.join(userDir, 'messages');
     if (!fs.existsSync(messagesDir)) {
       fs.mkdirSync(messagesDir, { recursive: true });
@@ -89,6 +80,10 @@ export async function POST(request: Request) {
       title: 'ورود موفق',
       content: `کاربر ${safeUserData.firstName} ${safeUserData.lastName} با شناسه ${safeUserData.userId} وارد شد.`,
       timestamp: now.toISOString(),
+      ip: geo.ip,
+      country: geo.country,
+      city: geo.city,
+      locale: geo.locale,
       read: false,
     };
 

@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { HomeIcon } from '@heroicons/react/24/solid';
+import Select from 'react-select';
 
 function generateCaptcha() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -16,8 +17,29 @@ function generateCaptcha() {
   return result;
 }
 
+type CountryOption = {
+  value: string;
+  label: string;
+  code: string;
+  flag: string;
+};
+
+const countryOptions: CountryOption[] = [
+  { value: 'IR', label: 'ایران', code: '+98', flag: '/icons/flags/ir.png' },
+  { value: 'AF', label: 'افغانستان', code: '+93', flag: '/icons/flags/af.png' },
+  { value: 'AZ', label: 'آذربایجان', code: '+994', flag: '/icons/flags/az.png' },
+  { value: 'AE', label: 'امارات', code: '+971', flag: '/icons/flags/ae.png' },
+  { value: 'TR', label: 'ترکیه', code: '+90', flag: '/icons/flags/tr.png' },
+  { value: 'IQ', label: 'عراق', code: '+964', flag: '/icons/flags/iq.png' },
+  { value: 'LB', label: 'لبنان', code: '+961', flag: '/icons/flags/lb.png' },
+  { value: 'IN', label: 'هند', code: '+91', flag: '/icons/flags/in.png' },
+];
+
 export default function LoginPage() {
   const router = useRouter();
+
+  const defaultCountry = countryOptions.find(c => c.value === 'IR')!;
+  const [selectedCountry, setSelectedCountry] = useState<CountryOption>(defaultCountry);
 
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -25,9 +47,13 @@ export default function LoginPage() {
   const [captchaCode, setCaptchaCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-
   useEffect(() => {
     setCaptchaCode(generateCaptcha());
+
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+    const countryCode = locale.split('-')[1]; // مثل "IR"
+    const matched = countryOptions.find(c => c.value === countryCode);
+    setSelectedCountry(matched ?? defaultCountry);
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -35,12 +61,15 @@ export default function LoginPage() {
     setError('');
     setSuccess('');
 
+    const cleanedPhone = phone.replace(/\D/g, '').replace(/^0/, '');
+    const fullPhone = '00' + selectedCountry.code.replace('+', '') + cleanedPhone;
+
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone,
+          phone: fullPhone,
           password,
           captchaInput,
           captchaCode,
@@ -88,6 +117,67 @@ export default function LoginPage() {
       setCaptchaCode(generateCaptcha());
     }
   };
+  const customSingleValue = ({ data }: any) => (
+    <div className="flex items-center gap-2 text-xs md:text-base">
+      <div className="w-6 h-4 flex items-center justify-center">
+        <Image src={data.flag} alt={data.label} width={24} height={18} />
+      </div>
+      <span className="truncate">{data.label}</span>
+    </div>
+  );
+
+  const customOption = (props: any) => {
+    const { data, innerRef, innerProps } = props;
+    return (
+      <div ref={innerRef} {...innerProps} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-700 cursor-pointer text-xs md:text-sm">
+        <div className="w-6 h-4 flex items-center justify-center">
+          <Image src={data.flag} alt={data.label} width={24} height={16} />
+        </div>
+        <span className="truncate">{data.label}</span>
+      </div>
+    );
+  };
+
+  const customStyles = {
+    control: (base: any) => ({
+      ...base,
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      color: 'white',
+      minHeight: '2.5rem',
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: '#1f2937',
+      color: 'white',
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isFocused ? '#374151' : '#1f2937',
+      color: 'white',
+      cursor: 'pointer',
+      fontSize: '0.75rem',
+      '@media (min-width: 768px)': {
+        fontSize: '0.875rem',
+      },
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: 'white',
+      fontSize: '0.75rem',
+      '@media (min-width: 768px)': {
+        fontSize: '1rem',
+      },
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: 'white',
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: '#9ca3af',
+    }),
+  };
 
   return (
     <main dir="rtl" className="relative min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex items-center justify-center px-4 py-10">
@@ -101,14 +191,29 @@ export default function LoginPage() {
           <h2 className="text-2xl font-bold text-yellow-400 mb-6 text-center">ورود با شماره همراه</h2>
 
           <form onSubmit={handleLogin} className="space-y-4">
-            <input
-              type="text"
-              placeholder="شماره همراه"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-              className="w-full px-4 py-3 rounded-md bg-gray-800 text-white placeholder-gray-400 text-right focus:outline-none focus:ring-2 focus:ring-yellow-500"
-            />
+            <div className="flex flex-row-reverse items-center gap-2">
+              <div className="w-40">
+                <Select
+                  options={countryOptions}
+                  value={selectedCountry}
+                  onChange={(option) => option && setSelectedCountry(option)}
+                  components={{ SingleValue: customSingleValue, Option: customOption }}
+                  styles={customStyles}
+                  className="text-right"
+                  isSearchable={false}
+                />
+              </div>
+              <span className="text-yellow-400 text-sm">{selectedCountry.code}</span>
+              <input
+                type="text"
+                placeholder="شماره همراه بدون صفر"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                className="px-11 py-4 rounded-md bg-gray-800 text-white placeholder-gray-400 text-right text-xs md:text-sm w-[20ch] md:w-auto"
+              />
+            </div>
+
             <input
               type="password"
               placeholder="رمز عبور"
@@ -118,7 +223,6 @@ export default function LoginPage() {
               className="w-full px-4 py-3 rounded-md bg-gray-800 text-white placeholder-gray-400 text-right focus:outline-none focus:ring-2 focus:ring-yellow-500"
             />
 
-            {/* لینک فراموشی رمز عبور */}
             <div className="text-right text-xs text-gray-400 mt-1">
               <Link href="/forgot-password" className="hover:text-yellow-400 transition-colors">
                 فراموشی رمز عبور؟
